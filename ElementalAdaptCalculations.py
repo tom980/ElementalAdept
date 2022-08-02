@@ -127,6 +127,8 @@ def saveDC_Generator(saveDC,stat,distWeight):
             prof = float(saves[stat][1:])
             if saves[stat][:1]=="-":
                 prof = -prof
+        else:
+            prof=0
         saveBonus = prof + math.floor(statvalue/2 - 5)
         rollRequired = saveDC-saveBonus
         if rollRequired <= 1:
@@ -141,7 +143,12 @@ def saveDC_Generator(saveDC,stat,distWeight):
 def attack_Generator(attackBonus,distWeight):
     def attack_Weight(monster):
         ac = find_field(monster,"ac")
-        ac = float(ac["ac"])
+
+        if isinstance(ac,list):
+            ac = ac[0]
+        if isinstance(ac,dict):
+            ac = ac["ac"]
+        
         rollRequired = ac-attackBonus
         if rollRequired <= 1:
             damageMult = 1.0
@@ -151,8 +158,9 @@ def attack_Generator(attackBonus,distWeight):
             damageMult = (21-rollRequired)/20
         return damageMult,distWeight(monster)[1]
     return attack_Weight
+
 #Where to find all the .json files
-pathDirectory = os.path.join(os.path.dirname(os.path.dirname(os.getcwd())),'data','bestiary')
+pathDirectory = os.path.join(os.getcwd(),'data','bestiary')
 
 #An index to convert from sources referenced in monster objects to actual file names
 index = readJSON(os.path.join(pathDirectory,'index.json'))
@@ -176,7 +184,7 @@ damageTypes = ["acid","cold","fire","lightning","thunder"]
 
 #### PROGRAM START ####
 
-normalDamage,resDamage,weight = damage_calc(mainSource,attack_Generator(3,Uniform_Weight),dataCache)
+normalDamage,resDamage,weight = damage_calc(mainSource,saveDC_Generator(15,"dex",Uniform_Weight),dataCache)
 
 print(normalDamage)
 print(resDamage)
