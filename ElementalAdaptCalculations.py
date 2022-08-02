@@ -3,6 +3,9 @@ from importlib.machinery import SourcelessFileLoader
 import json
 import os.path
 import fnmatch
+import math
+
+from numpy import roll
 
 def readJSON(path):
     with open(path,'r') as f:
@@ -60,12 +63,12 @@ def damage_calc(sources,weightFunction,dataCache):
         monsters = data["monster"]
         for monster in monsters:
             #Find the weighting from the cr (could possibly condense to one line)
-            dmgweight,expweight = weightFunction(monster)
+            dmgweight,distweight = weightFunction(monster)
 
-            totalWeight+=expweight
+            totalWeight+=distweight
 
             #Don't do all the work if weight is 0
-            if dmgweight!=0 and expweight!=0:
+            if dmgweight!=0 and distweight!=0:
 
                 #Find the list of damge types each type of modifier applies to
                 dmgmods = [["resist",[]],["immune",[]],["vulnerable",[]]]
@@ -91,8 +94,8 @@ def damage_calc(sources,weightFunction,dataCache):
                         ndmg = 0.0
                     elif dtype in dmgmods[2][1]:
                         ndmg = 2.0
-                    normalDamage[dtype]+=ndmg*expweight*dmgweight
-                    resDamage[dtype]+=rdmg*expweight*dmgweight
+                    normalDamage[dtype]+=ndmg*distweight*dmgweight
+                    resDamage[dtype]+=rdmg*distweight*dmgweight
 
     return normalDamage,resDamage,totalWeight
 
@@ -116,15 +119,38 @@ def InverseCR_Weight(monster):
         return 0.0,0.0
     return 1.0/cr,1.0/cr
 
-def saveDC_Generator(saveDC):
+def saveDC_Generator(saveDC,stat,distWeight):
     def save_Weight(monster):
-        cr = cr_to_float(find_field(monster,"cr"))
-        if cr == "":
-            return 0.0,0.0
-        if cr>cr_max or cr<cr_min:
-            return 0.0,0.0
-        saves = find_field(monster,"")
+        saves = find_field(monster,"save")
+        statvalue = find_field(monster,stat)
+        if stat in saves:
+            prof = float(saves[stat][1:])
+            if saves[stat][:1]=="-":
+                prof = -prof
+        saveBonus = prof + math.floor(statvalue/2 - 5)
+        rollRequired = saveDC-saveBonus
+        if rollRequired <= 1:
+            damageMult = 1.0
+        elif rollRequired >= 21:
+            damageMult = 0.0
+        else:
+            damageMult = (21 - saveBonus)*0.05
+        return damageMult,distWeight(monster)[1]
+    return save_Weight
 
+def attack_Generator(attackBonus,distWeight):
+    def attack_Weight(monster):
+        ac = find_field(monster,"ac")
+        ac = float(ac["ac"])
+        rollRequired = ac-attackBonus
+        if rollRequired <= 1:
+            damageMult = 1.0
+        elif rollRequired >= 21:
+            damageMult = 0.0
+        else:
+            damageMult = (21-rollRequired)/20
+        return damageMult,distWeight(monster)[1]
+    return attack_Weight
 #Where to find all the .json files
 pathDirectory = os.path.join(os.path.dirname(os.path.dirname(os.getcwd())),'data','bestiary')
 
@@ -150,7 +176,7 @@ damageTypes = ["acid","cold","fire","lightning","thunder"]
 
 #### PROGRAM START ####
 
-normalDamage,resDamage,weight = damage_calc(mainSource,Uniform_Weight,dataCache)
+normalDamage,resDamage,weight = damage_calc(mainSource,attack_Generator(3,Uniform_Weight),dataCache)
 
 print(normalDamage)
 print(resDamage)
