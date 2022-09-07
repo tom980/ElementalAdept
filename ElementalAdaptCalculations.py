@@ -4,6 +4,7 @@ import json
 import os.path
 import fnmatch
 import math
+import matplotlib.pyplot as plt
 
 from numpy import roll
 
@@ -117,7 +118,7 @@ def InverseCR_Weight(monster):
         return 0.0,0.0
     if cr == 0.0:
         return 0.0,0.0
-    return 1.0/cr,1.0/cr
+    return (1.0/cr)**0.2,(1.0/cr)**0.2
 
 def saveDC_Generator(saveDC,stat,distWeight):
     def save_Weight(monster):
@@ -132,11 +133,11 @@ def saveDC_Generator(saveDC,stat,distWeight):
         saveBonus = prof + math.floor(statvalue/2 - 5)
         rollRequired = saveDC-saveBonus
         if rollRequired <= 1:
-            damageMult = 1.0
+            damageMult = 0.5
         elif rollRequired >= 21:
-            damageMult = 0.0
+            damageMult = 1
         else:
-            damageMult = (21 - saveBonus)*0.05
+            damageMult = 1-(0.5*(21 - rollRequired)*0.05)
         return damageMult,distWeight(monster)[1]
     return save_Weight
 
@@ -184,22 +185,33 @@ damageTypes = ["acid","cold","fire","lightning","thunder"]
 
 #### PROGRAM START ####
 
-normalDamage,resDamage,weight = damage_calc(mainSource,saveDC_Generator(15,"dex",Uniform_Weight),dataCache)
-
-print(normalDamage)
-print(resDamage)
-
-increase_percent = {}
+dc_list = []
+save_damages={}
+save_damages_feat={}
+percent_increase={}
 for dtype in damageTypes:
-    increase_percent[dtype] = round(100*resDamage[dtype]/normalDamage[dtype],5)
-print("percent increase of multiplier",increase_percent)
+    save_damages[dtype] = []
+    save_damages_feat[dtype] = []
+    percent_increase[dtype]=[]
+for dc in range(5,26):
+    data = damage_calc(mainSource+fizzSource,saveDC_Generator(dc,"con",Uniform_Weight),dataCache)
+    for dtype in damageTypes:
+        save_damages[dtype].append(data[0][dtype]/data[2])
+        save_damages_feat[dtype].append((data[0][dtype]+data[1][dtype])/data[2])
+        percent_increase[dtype].append(100*data[1][dtype]/data[0][dtype])
+    dc_list.append(dc)
 
-expected_multiplier_feat = {}
+fig,ax=plt.subplots()
 for dtype in damageTypes:
-    expected_multiplier_feat[dtype] = round((resDamage[dtype]+normalDamage[dtype])/weight,5)
-print("expected multiplier with feat",expected_multiplier_feat)
+    plt.plot(dc_list,save_damages_feat[dtype],label=dtype)
+    plt.plot(dc_list,save_damages[dtype],label=dtype+"base")
+plt.legend()
+ax.set_xlabel("Effect save DC")
+ax.set_ylabel("Expected Damage Multiplier")
+ax.grid(True)
+#plt.show()
 
-expected_multiplier = {}
-for dtype in damageTypes:
-    expected_multiplier[dtype] = round((normalDamage[dtype])/weight,5)
-print("expected multiplier without feat",expected_multiplier)
+data = damage_calc(allSource,InverseCR_Weight,dataCache)
+
+print(data[1]["fire"]/data[0]["fire"])
+
