@@ -209,7 +209,7 @@ plt.legend()
 ax.set_xlabel("Effect save DC")
 ax.set_ylabel("Expected Damage Multiplier")
 ax.grid(True)
-#plt.show()
+plt.show()
 
 data = damage_calc(allSource,InverseCR_Weight,dataCache)
 
